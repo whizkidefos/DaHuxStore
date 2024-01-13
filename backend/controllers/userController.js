@@ -30,4 +30,55 @@ const createUser = asyncHandler(async (req, res) => {
     console.log(req.body);
 });
 
-export { createUser };
+const loginUser = async (req, res) => {
+    const { email, password } = req.body;
+    if (!email || !password) {
+        res.status(400);
+        throw new Error('Please fill all fields');
+    }
+
+    const existingUser = await User.findOne({ email });
+
+    if (existingUser) {
+        const isPasswordValid = await bcrypt.compare(password, existingUser.password);
+
+        if (isPasswordValid) {
+            createToken(res, existingUser._id);
+
+            res.status(200).json(existingUser);
+            return;
+        } else {
+            res.status(400);
+            throw new Error('Invalid credentials');
+        }
+    }
+
+    const user = await User.findOne({ email });
+    if (!user) {
+        res.status(400);
+        throw new Error('Invalid credentials');
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+        res.status(400);
+        throw new Error('Invalid credentials');
+    }
+
+    createToken(res, user._id);
+
+    res.status(200).json(user);
+};
+
+const logoutCurrentUser = asyncHandler(async (req, res) => {
+    res.cookie('token', '', {
+        expires: new Date(Date.now()),
+        httpOnly: true,
+        sameSite: 'strict',
+        secure: process.env.NODE_ENV !== 'development',
+    });
+
+    res.status(200).send('User logged out');
+});
+
+export { createUser, loginUser, logoutCurrentUser };
